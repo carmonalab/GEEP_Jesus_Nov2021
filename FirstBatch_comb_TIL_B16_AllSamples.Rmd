@@ -1,0 +1,385 @@
+---
+title: Analysis of GEEP Jesus Combo ACT CD8 TIL, first batch
+author: "M. Andreatta <massimo.andreatta at unil.ch> and S. Carmona <santiago.carmona at unil.ch>"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.Jesus.1120.html'))})
+#output: html_notebook
+---
+
+```{r}
+renv::activate()
+renv::restore()
+library(remotes)
+#install_github("carmonalab/ProjecTILs",ref="v2.0.0")
+#install_github("ncborcherding/scRepertoire",ref="3f676c5beca96878585811ed557813dafd241e48") # version 1.3.2
+
+```
+
+
+```{r message=FALSE}
+library(Seurat)
+library(ggplot2)
+library(scRepertoire)
+library(ProjecTILs)
+#library(ggpubr)
+```
+
+
+```{r message=FALSE}
+source("FirstBatch_functions.R")
+```
+
+
+
+
+```{r}
+# raw data in available in https://drive.switch.ch/index.php/s/ef1YzkMDkparotX
+data.seurat <- Read10X("~/switchdrive/CSI/data/Jesus_2019/Jesus_all/")
+data.seurat <- CreateSeuratObject(counts = data.seurat, project = "JesusAll", min.cells = 3, min.features = 50)
+data.seurat$Sample <- substring(colnames(data.seurat),18)
+table(data.seurat$Sample)
+metaData <- read.csv("~/switchdrive/CSI/data/Jesus_2019/Jesus_all/aggregation_csv.csv",as.is = T)
+data.seurat$Timepoint <- factor(data.seurat$Sample, levels = c(1:8), labels=metaData$grp)
+data.seurat$Treatment <- factor(data.seurat$Sample, levels = c(1:8), labels=metaData$treatment)
+data.seurat$Sample <- factor(paste(data.seurat$Timepoint,data.seurat$Treatment,sep="-"))
+
+data.seurat$SampleLabel <- data.seurat$Sample
+table(data.seurat$SampleLabel)
+```
+
+Ribosomal and mitochondrial content
+```{r}
+data.seurat <- AddMetaData(data.seurat, metadata = PercentageFeatureSet(data.seurat, pattern = "^Rp[ls]"), col.name = "percent.ribo")
+data.seurat <- AddMetaData(data.seurat, metadata = PercentageFeatureSet(data.seurat, pattern = "^mt-"), col.name = "percent.mito")
+```
+
+Filter out outliers & low quality cells
+```{r fig.height= 10}
+Idents(data.seurat) <- "Sample"
+VlnPlot(data.seurat, features = c("nFeature_RNA", "nCount_RNA","percent.ribo","percent.mito"), ncol = 2, pt.size=0.01)
+
+cutoffs <- list()
+cutoffs[["percent.ribo"]] <- c(min=max(quantile(data.seurat$percent.ribo,probs=c(0.01)),5),max=min(quantile(data.seurat$percent.ribo,probs=c(0.99)),60))
+cutoffs[["percent.mito"]] <- c(min=max(quantile(data.seurat$percent.mito,probs=c(0.01)),0),max=min(quantile(data.seurat$percent.mito,probs=c(0.99)),10))
+cutoffs[["nFeature_RNA"]] <- c(min=max(quantile(data.seurat$nFeature_RNA,probs=c(0.01)),500),max=min(quantile(data.seurat$nFeature_RNA,probs=c(0.99)),6000))
+cutoffs[["nCount_RNA"]] <- c(min=max(quantile(data.seurat$nCount_RNA,probs=c(0.01)),2000),max=min(quantile(data.seurat$nCount_RNA,probs=c(0.99)),40000))
+
+print(cutoffs)
+
+dim(data.seurat)
+
+data.seurat <- subset(data.seurat, subset = nFeature_RNA > cutoffs[["nFeature_RNA"]]["min"] & nFeature_RNA < cutoffs[["nFeature_RNA"]]["max"] & 
+                       nCount_RNA > cutoffs[["nCount_RNA"]]["min"] & nCount_RNA < cutoffs[["nCount_RNA"]]["max"] &
+                       percent.ribo > cutoffs[["percent.ribo"]]["min"] &  percent.ribo < cutoffs[["percent.ribo"]]["max"] &
+                    percent.mito > cutoffs[["percent.mito"]]["min"] & percent.mito < cutoffs[["percent.mito"]]["max"] )
+dim(data.seurat)
+
+Idents(data.seurat) <- "Sample"
+VlnPlot(data.seurat, features = c("nFeature_RNA", "nCount_RNA","percent.ribo","percent.mito"), ncol = 2, pt.size=0.01)
+
+```
+
+
+
+```{r}
+removeGenes <- unique(unique(unlist(scGate::genes.blacklist.default$Mm)))
+length(removeGenes)
+```
+
+
+```{r}
+VlnPlot(data.seurat, features = c("Ptprc", "Cd2","Cd8a","Pdcd1"), ncol = 2, pt.size=0.01)
+data.seurat <- NormalizeData(data.seurat)
+VlnPlot(data.seurat, features = c("Ptprc", "Cd2","Cd8a","Pdcd1"), ncol = 2, pt.size=0.01)
+data.seurat <- FindVariableFeatures(data.seurat, selection.method = "vst", nfeatures = 2000, verbose = FALSE)
+length(data.seurat@assays$RNA@var.features)
+data.seurat@assays$RNA@var.features <- data.seurat@assays$RNA@var.features[!data.seurat@assays$RNA@var.features %in% removeGenes]
+```
+
+
+```{r}
+set.seed(12345)
+
+data.seurat <- ScaleData(data.seurat, do.scale = TRUE, do.center = TRUE) 
+data.seurat <- RunPCA(object = data.seurat, features = data.seurat@assays$RNA@var.features, ndims.print = 1:5, nfeatures.print = 10)
+
+```
+
+
+
+
+```{r}
+ndim=10
+data.seurat <- RunUMAP(data.seurat, reduction = "pca", dims = 1:ndim, seed.use=123, n.neighbors = 30, min.dist = 0.3)
+```
+
+```{r}
+DimPlot(data.seurat, reduction = "umap", group.by = "SampleLabel") + ggtitle("UMAP by study")
+```
+
+```{r}
+DimPlot(data.seurat, reduction = "umap", group.by = "Treatment") + ggtitle("UMAP by study")
+```
+
+
+
+```{r}
+FeaturePlot(data.seurat,features=c("Ptprc","Spi1","Cd2","Cd8a","Cd8b1","Cd4"),reduction = "umap",cols = c("lightgrey", "blue"))
+FeaturePlot(data.seurat,features=c("Mki67","Ncr1","Klra8","Fcer1g"),reduction = "umap",cols = c("lightgrey", "blue"))
+FeaturePlot(data.seurat,features=qq(Ifitm2,Lgals3,AA467197,Hilpda),reduction = "umap",cols = c("lightgrey", "blue"),sort.cell = T)
+FeaturePlot(data.seurat,features=qq(Bnip3,Ifitm3,Fcer1g,Spi1),reduction = "umap",cols = c("lightgrey", "blue"),sort.cell = T)
+FeaturePlot(data.seurat,features=qq(Foxp3,Tyrobp,Csf1r,Cd14),reduction = "umap",cols = c("lightgrey", "blue"),sort.cell = T)
+FeaturePlot(data.seurat,features=c("H2-Aa","H2-Ab1","Cd19"),reduction = "umap",cols = c("lightgrey", "blue"),sort.cell = T)
+
+```
+```{r}
+scGateModels <- get_scGateDB()
+data.seurat <- scGate(data.seurat, scGateModels$mouse$generic$CD8T, additional.signatures = list("G1S"=scGate::genes.blacklist.default$Mm$cellCycle.G1S, "G2M"=scGate::genes.blacklist.default$Mm$cellCycle.G2M))
+plot_levels(data.seurat)
+```
+
+```{r}
+table(data.seurat$is.pure,data.seurat$Sample)
+data.seurat.CD8 <- subset(data.seurat, subset=is.pure=="Pure")
+```
+
+Remove cycling cells, not interesting
+```{r}
+hist(data.seurat.CD8$G1S_UCell)
+hist(data.seurat.CD8$G2M_UCell)
+data.seurat.CD8 <- subset(data.seurat.CD8, subset=G1S_UCell < 0.1 & G2M_UCell < 0.1)
+```
+
+```{r}
+table(data.seurat.CD8$SampleLabel)
+Idents(data.seurat.CD8) <- "SampleLabel"
+set.seed(123)
+data.seurat.CD8 <- subset(data.seurat.CD8, downsample = 600)
+data.seurat.CD8$SampleLabel <- factor(data.seurat.CD8$SampleLabel)
+table(data.seurat.CD8$SampleLabel)
+```
+
+
+```{r}
+set.seed(12345)
+data.seurat.CD8 <- FindVariableFeatures(data.seurat.CD8, selection.method = "vst", nfeatures = 1000, verbose = FALSE)
+length(data.seurat.CD8@assays$RNA@var.features)
+data.seurat.CD8@assays$RNA@var.features <- data.seurat.CD8@assays$RNA@var.features[!data.seurat.CD8@assays$RNA@var.features %in% removeGenes]
+length(data.seurat.CD8@assays$RNA@var.features)
+```
+
+```{r}
+set.seed(12345)
+data.seurat.CD8 <- ScaleData(data.seurat.CD8, do.scale = TRUE, do.center = TRUE) 
+data.seurat.CD8 <- RunPCA(object = data.seurat.CD8, features = data.seurat.CD8@assays$RNA@var.features, ndims.print = 1:5, nfeatures.print = 10)
+ndim=30
+data.seurat.CD8 <- RunUMAP(data.seurat.CD8, reduction = "pca", dims = 1:ndim, seed.use=123)
+```
+
+```{r}
+#DimPlot(data.seurat.CD8, reduction = "umap", group.by = "cycling") + ggtitle("UMAP by study")
+DimPlot(data.seurat.CD8, reduction = "umap", group.by = "Treatment") + ggtitle("UMAP by study")
+DimPlot(data.seurat.CD8, reduction = "umap", group.by = "SampleLabel") + ggtitle("UMAP by study")
+```
+
+
+
+```{r}
+FeaturePlot(object = data.seurat.CD8, features = qq(Tcf7,Pdcd1,Havcr2,Tox,Gzmb,Gzmk,Gzmc,Gzma,Mki67),order = T)
+FeaturePlot(object = data.seurat.CD8, features = qq(Tcf7,Tox,Gzmc,Mki67),order = T)
+```
+
+
+```{r}
+set.seed(12345)
+
+data.seurat.CD8 <- FindNeighbors(data.seurat.CD8, reduction = "pca", dims = 1:ndim)
+data.seurat.CD8  <- FindClusters(data.seurat.CD8, resolution = 0.3)
+
+data.seurat.CD8$cluster <- factor(data.seurat.CD8@active.ident)
+data.seurat.CD8$cluster.lab <- factor(data.seurat.CD8@active.ident)
+
+DimPlot(data.seurat.CD8, reduction = "umap", group.by = "cluster.lab") + ggtitle("UMAP by study")
+```
+
+```{r}
+ref <- load.reference.map()
+data.seurat.CD8 <- make.projection(data.seurat.CD8,filter.cells = F)
+plot.projection(ref,data.seurat.CD8)
+data.seurat.CD8 <- cellstate.predict(ref,data.seurat.CD8)
+```
+
+
+```{r}
+DimPlot(data.seurat.CD8, reduction = "umap", split.by  = "cluster",ncol = 3) + ggtitle("UMAP by study")
+DimPlot(data.seurat.CD8, reduction = "umap", group.by = "functional.cluster",ncol = 3) + ggtitle("UMAP by study")
+```
+
+```{r fig.width=5, fig.height=5}
+#FeaturePlot(object = data.seurat.CD8, features = c("Mki67","Birc5","Ccna2","Mt1"))
+#FeaturePlot(object = data.seurat.CD8, features = qq(Gzmb,Gzmc,Tcf7,Pdcd1),sort.cell=T,slot = "data")
+#FeaturePlot(object = data.seurat.CD8, features = qq(Gzmk,Ly6c2,Tcf7,Pdcd1),sort.cell=T,slot = "data")
+FeaturePlot(object = data.seurat.CD8, features = qq(Tcf7,Pdcd1,Havcr2,Tox,Gzmb,Gzmk,Gzmc,Gzma,Mki67),sort.cell=T,slot = "data")
+#ggsave("pdf/Combo.Markers.pdf",width = 12, height = 10)
+#FeaturePlot(object = data.seurat.CD8, features = qq(Il33,Il1rl1,Il2,Pdcd1lg2,Cd274,Cd28),sort.cell=T,slot = "data")
+```
+
+
+
+
+
+```{r}
+Idents(data.seurat.CD8) <- "cluster"
+cd8.markers <- FindAllMarkers(object = data.seurat.CD8, only.pos = TRUE, min.pct = 0.1, min.diff.pct = 0.2, logfc.threshold = 0.25, test.use = "MAST")
+#cd8.markers.01 <- FindMarkers(object = data.seurat.CD8, ident.1 = "0", ident.2 = "1", only.pos = F, min.pct = 0.1, min.diff.pct = 0.1, logfc.threshold = 0.25, test.use = "MAST")
+```
+
+```{r}
+library(dplyr)
+
+#cd8.markers.01 %>% top_n(20, avg_logFC)
+
+cd8.markers %>% group_by(cluster) %>% top_n(20, avg_logFC)
+
+tapply(cd8.markers$gene,cd8.markers$cluster,length)
+
+cd8.markers.list <- split(cd8.markers,cd8.markers$cluster)
+
+cd8.markers.list <- lapply((cd8.markers.list),function(x) x$gene)
+
+```
+
+0: Gzmk EM
+1: Gzma EM
+2: Gzmc
+3: Exhausted
+4: Cycling
+
+
+All samples:
+Tox EM
+EM
+Ex
+Naive
+Gzmc
+Cycling
+Ifit
+Xcl1
+
+Gzmk
+Ex
+Gzmc
+Naive
+Cycling
+Xcl1-CD25-Ifng
+Ifit
+
+
+```{r}
+
+#data.seurat.CD8@meta.data$cluster.lab <- factor(data.seurat.CD8@meta.data$cluster,labels = qq(EM_Tox,EM,Gzmc,Exhausted,Cycling,EM_Tox))
+#data.seurat.CD8@meta.data$cluster.lab <- factor(data.seurat.CD8@meta.data$cluster,labels = qq(EM_Tox,EM,Exhausted,NaiveLike,Gzmc,Cycling,EM,MemoryLike))
+#data.seurat.CD8@meta.data$cluster.lab <- factor(data.seurat.CD8@meta.data$cluster,labels = qq(EM,Exhausted,Gzmc,NaiveLike,Cycling,MemoryLike,EM))
+#data.seurat.CD8@meta.data$cluster.lab <- factor(data.seurat.CD8@meta.data$cluster.lab, levels = qq(NaiveLike,EM,MemoryLike,Cycling,Exhausted,Gzmc))
+data.seurat.CD8@meta.data$cluster.lab <- factor(data.seurat.CD8@meta.data$cluster,labels = qq(EM,Exhausted,Gzmc,NaiveLike,Cycling,Exhausted,EM))
+data.seurat.CD8@meta.data$cluster.lab <- factor(data.seurat.CD8@meta.data$cluster.lab, levels = qq(NaiveLike,EM,Cycling,Exhausted,Gzmc))
+
+#data.seurat.CD8@meta.data$cluster.lab <- factor(data.seurat.CD8@meta.data$cluster,labels = qq(EffectorMemory,Exhausted,NaiveLike,Gzmc,Cycling,MemoryLike))
+
+#clusterColors <- gg_color_hue(7)[c(1,2,6,7,5,3)]
+#clusterColors <- gg_color_hue(7)[c(6,1,4,2,7,5)]
+
+clusterColors <- c("#F8766D","#F8FF6D","#A58AFF","#00B6EB","#53B400","#000000","#FF00FF","#C49A00")
+names(clusterColors) <- qq(NaiveLike,EM_Tox,EM,MemoryLike,Exhausted,unknown,Cycling,Gzmc) 
+#names(clusterColors) <- qq(NaiveLike,EffectorMemory,MemoryLike,Exhausted,unknown,Cycling,Gzmc) 
+#clusterColors <- gg_color_hue(7)[c(6,4,1,2,7)]
+#names(clusterColors) <- levels(data.seurat.CD8@meta.data$res.0.6.lab)
+  
+
+```
+
+
+
+```{r}
+Idents(data.seurat.CD8) <- "cluster.lab"
+UMAPPlot(object = data.seurat.CD8, label = TRUE, cols = clusterColors[levels(data.seurat.CD8$cluster.lab)] ) + theme(aspect.ratio = 1) + NoLegend() + ggtitle("UMAP of cell clusters")
+#ggsave("pdf/allSamples.umap.cluster.labels.ps",width = 5, height = 5)
+#TSNEPlot(object = data.seurat.CD8, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "res.0.6.lab", colors.use = clusterColors[levels(data.seurat.CD8@meta.data$cluster.lab)])
+    #ggsave("pdf/tsne.cluster.pdf",width = 5, height = 5)
+#TSNEPlot(object = data.seurat.CD8, do.return = TRUE, no.legend = T, do.label = F, group.by = "res.0.6.lab", colors.use = clusterColors)
+
+```
+
+```{r}
+facsMarkers <- qq(Mki67,Sell,Il7r,Tcf7,Lef1,Xcl1,Il2ra,Slamf6,Klrg1,Id3,Id2,Tnfrsf9,Ly6c2,Gzmk,Gzma,Gzmb,Gzmc,Bcl2,Bcl2l11,Batf,Tox,Pdcd1,Lag3,Tigit,Havcr2,Entpd1)
+
+Idents(data.seurat.CD8) <- "cluster.lab"
+#Idents(data.seurat.CD8) <- factor(Idents(data.seurat.CD8),levels=rev(qq(NaiveLike,EffectorMemory,Cycling,Exhausted,MemoryLike,Gzmc)))
+#Idents(data.seurat.CD8) <- factor(Idents(data.seurat.CD8),levels=rev(qq(EM,EM_Tox,Cycling,Exhausted,Gzmc)))
+
+DotPlot(data.seurat.CD8, features = rev(facsMarkers), cols= "RdYlGn") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+ 
+ggsave("pdf/allSamples.DotPlot.clusters.filter.ps",width = 8, height = 3)
+
+```
+
+
+
+```{r, fig.width=3, fig.height=3, fig.asp=0.6}
+library(cowplot)
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.7, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$Treatment=="combo",]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$Treatment %in% c("mIL2+decoy","UT"),]), mapping=aes(x=UMAP_1,y=UMAP_2),color="gray80",n=100,h=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$Treatment=="IL33+decoy",]),mapping=aes(x=UMAP_1,y=UMAP_2),color="red",n=100,h=2) + guides(color=guide_legend(title="CD8 state")) + scale_colour_manual(values=clusterColors) + theme_cowplot()
+# try to plot only 1 contour level
+#ggsave("pdf/tsne.cluster.treatmentCountour.pdf")
+
+```
+
+
+```{r, fig.width=3, fig.height=3, fig.asp=0.6}
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.7, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$Treatment=="combo",]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black", n=100, h=2) + guides(color=guide_legend(title="CD8 state")) + ggtitle("Combo")  + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right")
+#ggsave("pdf/tsne.cluster.comboCountour.pdf",width = 5,height = 5)
+
+```
+
+
+```{r, fig.width=3, fig.height=3, fig.asp=0.6}
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T1-combo",]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black", n=100, h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("Combo T1") + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right") 
+ggsave("pdf/allSamples.umap.cluster.comboT1.countour.2.pdf",width = 5,height = 5)
+
+```
+
+```{r, fig.width=3, fig.height=3, fig.asp=0.6}
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T2-combo",]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("Combo T2") + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right") 
+ggsave("pdf/allSamples.umap.cluster.comboT2.countour.2.pdf",width = 5,height = 5)
+
+```
+
+```{r, fig.width=3, fig.height=3, fig.asp=0.6}
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T3-combo",]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("Combo T3")  + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right")
+ggsave("pdf/allSamples.umap.cluster.comboT3.countour.2.pdf",width = 5,height = 5)
+
+```
+
+
+```{r, fig.width=3, fig.height=3, fig.asp=0.6}
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel %in% c("T1-UT","T2-UT"),]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("UT")  + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right")
+ggsave("pdf/allSamples.umap.cluster.UT.countour.2.pdf",width = 5,height = 5)
+
+```
+
+
+
+```{r, fig.width=3, fig.height=3, fig.asp=0.6}
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T2-decoy_mIL2",]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("T2-decoy_mIL2")  + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right")
+ggsave("pdf/allSamples.umap.cluster.T2-decoy_mIL2.countour.2.pdf",width = 5,height = 5)
+
+```
+
+
+```{r, fig.width=3, fig.height=3, fig.asp=0.6}
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T2-decoy_IL33",]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("T2-decoy_IL33")  + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right")
+ggsave("pdf/allSamples.umap.cluster.T2-decoy_IL33.countour.2.pdf",width = 5,height = 5)
+
+```
