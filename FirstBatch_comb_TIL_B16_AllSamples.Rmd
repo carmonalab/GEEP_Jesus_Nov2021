@@ -319,7 +319,9 @@ FeaturePlot(data.seurat.CD8.projected.Tex,features = c("Gzmc","Tox"), split.by =
 Idents(data.seurat.CD8.projected) <- "functional.cluster"
 data.seurat.CD8.projected.Tex <- subset(data.seurat.CD8.projected, idents = "CD8_Tex")
 Idents(data.seurat.CD8.projected.Tex) <- "cluster.lab"
-markers4vs5 <- FindMarkers(data.seurat.CD8.projected.Tex,ident.1 = "C4",ident.2 = "C5",test.use = "MAST", min.diff.pct = 0.01,logfc.threshold = 0.1)
+VlnPlot(data.seurat.CD8.projected.Tex,features = c("Tox","Gzmc","Pdcd1"))
+DefaultAssay(data.seurat.CD8.projected.Tex) <- "RNA"
+markers4vs5 <- FindMarkers(data.seurat.CD8.projected.Tex,ident.1 = "C4",ident.2 = "C5",test.use = "MAST", min.diff.pct = 0.01,logfc.threshold = 0.25, min.pct=0.05, assay="RNA")
 ```
 
 ```{r}
@@ -327,5 +329,7 @@ library(EnhancedVolcano)
 EnhancedVolcano(markers4vs5,
     lab = rownames(markers4vs5),
     x = 'avg_log2FC',
-    y = 'p_val',FCcutoff = 0.5,drawConnectors = T)
+    y = 'p_val',FCcutoff = 1, drawConnectors = T, maxoverlapsConnectors = 50, pCutoff = 1e-10)
+ggsave("pdf/Tex.c4vsc5.volcano.pdf",width = 6,height = 6)
+
 ```
