@@ -13,6 +13,8 @@ knit: (function(input_file, encoding) {
 renv::activate()
 renv::restore()
 library(remotes)
+#install_github("carmonalab/UCell", ref="v1.1")
+#install_github("carmonalab/scGate",ref="v1.0.0")
 #install_github("carmonalab/ProjecTILs",ref="v2.0.0")
 #install_github("ncborcherding/scRepertoire",ref="3f676c5beca96878585811ed557813dafd241e48") # version 1.3.2
 
@@ -32,11 +34,8 @@ library(ProjecTILs)
 source("FirstBatch_functions.R")
 ```
 
-
-
-
+# Raw data in available in https://drive.switch.ch/index.php/s/ef1YzkMDkparotX
 ```{r}
-# raw data in available in https://drive.switch.ch/index.php/s/ef1YzkMDkparotX
 data.seurat <- Read10X("~/switchdrive/CSI/data/Jesus_2019/Jesus_all/")
 data.seurat <- CreateSeuratObject(counts = data.seurat, project = "JesusAll", min.cells = 3, min.features = 50)
 data.seurat$Sample <- substring(colnames(data.seurat),18)
@@ -127,12 +126,12 @@ DimPlot(data.seurat, reduction = "umap", group.by = "Treatment") + ggtitle("UMAP
 
 
 ```{r}
-FeaturePlot(data.seurat,features=c("Ptprc","Spi1","Cd2","Cd8a","Cd8b1","Cd4"),reduction = "umap",cols = c("lightgrey", "blue"))
+FeaturePlot(data.seurat,features=c("Ptprc","Spi1","H2-Aa","Cd19"),reduction = "umap",cols = c("lightgrey", "blue"))
+FeaturePlot(data.seurat,features=c("Cd2","Cd8a","Cd8b1","Cd4"),reduction = "umap",cols = c("lightgrey", "blue"))
 FeaturePlot(data.seurat,features=c("Mki67","Ncr1","Klra8","Fcer1g"),reduction = "umap",cols = c("lightgrey", "blue"))
 FeaturePlot(data.seurat,features=qq(Ifitm2,Lgals3,AA467197,Hilpda),reduction = "umap",cols = c("lightgrey", "blue"),sort.cell = T)
 FeaturePlot(data.seurat,features=qq(Bnip3,Ifitm3,Fcer1g,Spi1),reduction = "umap",cols = c("lightgrey", "blue"),sort.cell = T)
 FeaturePlot(data.seurat,features=qq(Foxp3,Tyrobp,Csf1r,Cd14),reduction = "umap",cols = c("lightgrey", "blue"),sort.cell = T)
-FeaturePlot(data.seurat,features=c("H2-Aa","H2-Ab1","Cd19"),reduction = "umap",cols = c("lightgrey", "blue"),sort.cell = T)
 
 ```
 ```{r}
@@ -207,6 +206,8 @@ names(clusterColors) <- c("C1","C2","C3","C4","C5")
 
 
 DimPlot(data.seurat.CD8, reduction = "umap", group.by = "cluster.lab", cols = clusterColors) + ggtitle("UMAP by study") + theme(aspect.ratio = 1)
+
+ggsave("pdf/unsup.umap.clusters.annot.pdf",width = 5, height = 5)
 ```
 
 ```{r}
@@ -223,35 +224,80 @@ ggsave("pdf/allSamples.VlnPlot.clusters.pdf",width = 5, height = 5)
 
 ```{r, fig.width=3, fig.height=3, fig.asp=0.6}
 library(cowplot)
-ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T1-combo",]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black", n=100, h=2, size=0.5) + guides(color=guide_legend(title="CD8 state")) + ggtitle("Combo T1") + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right") 
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) +
+       geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) +
+        geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T1-combo",]),     
+                        mapping=aes(x=UMAP_1,y=UMAP_2),color="black", n=100, h=2, size=0.5) + guides(color=guide_legend(title="CD8 state")) +
+          ggtitle("Combo T1") + scale_colour_manual(values=clusterColors) + 
+         theme_cowplot() + NoLegend() + 
+          theme(aspect.ratio = 1, legend.position="right",
+                axis.title=element_blank(),
+                axis.text=element_blank(),
+                axis.ticks=element_blank())
+
 ggsave("pdf/unsup.umap.cluster.comboT1.countour.pdf",width = 5,height = 5)
 ```
 
 ```{r, fig.width=3, fig.height=3, fig.asp=0.6}
-ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T2-combo",]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=0.5) + guides(color=guide_legend(title="CD8 state")) + ggtitle("Combo T2") + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right") 
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + 
+  geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + 
+  geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T2-combo",]), 
+                  mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("Combo T2") + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right",
+                axis.title=element_blank(),
+                axis.text=element_blank(),
+                axis.ticks=element_blank())
+
 ggsave("pdf/unsup.umap.cluster.comboT2.countour.pdf",width = 5,height = 5)
 ```
 
 ```{r, fig.width=3, fig.height=3, fig.asp=0.6}
-ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T3-combo",]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("Combo T3")  + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right")
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + 
+  geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + 
+  geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T3-combo",]), 
+                  mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("Combo T3")  + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right",
+                axis.title=element_blank(),
+                axis.text=element_blank(),
+                axis.ticks=element_blank())
+
 ggsave("pdf/unsup.umap.cluster.comboT3.countour.pdf",width = 5,height = 5)
 ```
 
 
 ```{r, fig.width=3, fig.height=3, fig.asp=0.6}
-ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel %in% c("T1-UT","T2-UT"),]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("UT")  + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right")
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + 
+  geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + 
+  geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel %in% c("T1-UT","T2-UT"),]), 
+                  mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("UT")  + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right",
+                axis.title=element_blank(),
+                axis.text=element_blank(),
+                axis.ticks=element_blank())
+
 ggsave("pdf/unsup.umap.cluster.UT.countour.pdf",width = 5,height = 5)
 ```
 
 ```{r, fig.width=3, fig.height=3, fig.asp=0.6}
-ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T2-decoy_mIL2",]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("T2-decoy_mIL2")  + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right")
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + 
+  geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + 
+  geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T2-decoy_mIL2",]), 
+                  mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("T2-decoy_mIL2")  + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right",
+                axis.title=element_blank(),
+                axis.text=element_blank(),
+                axis.ticks=element_blank())
+
 ggsave("pdf/unsup.umap.cluster.mIL2.countour.pdf",width = 5,height = 5)
 
 ```
 
 
 ```{r, fig.width=3, fig.height=3, fig.asp=0.6}
-ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T2-decoy_IL33",]), mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("T2-decoy_IL33")  + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right")
+ggplot(data.frame(data.seurat.CD8@reductions$umap@cell.embeddings), aes(x=UMAP_1,y=UMAP_2)) + 
+  geom_point(aes(color=data.seurat.CD8@meta.data$cluster.lab),alpha=0.4, size=2) + 
+  geom_density_2d(data=data.frame(data.seurat.CD8@reductions$umap@cell.embeddings[data.seurat.CD8@meta.data$SampleLabel=="T2-decoy_IL33",]), 
+                  mapping=aes(x=UMAP_1,y=UMAP_2),color="black",n=100,h=2, size=1) + guides(color=guide_legend(title="CD8 state")) + ggtitle("T2-decoy_IL33")  + scale_colour_manual(values=clusterColors) + theme_cowplot() + NoLegend() + theme(aspect.ratio = 1, legend.position="right",
+                axis.title=element_blank(),
+                axis.text=element_blank(),
+                axis.ticks=element_blank())
+
 ggsave("pdf/unsup.umap.cluster.IL33.countour.pdf",width = 5,height = 5)
 ```
 
@@ -269,12 +315,17 @@ data.seurat.CD8.projected <- cellstate.predict(ref,data.seurat.CD8.projected)
 
 ```{r}
 data.seurat.CD8 <- AddMetaData(data.seurat.CD8,data.seurat.CD8.projected$functional.cluster,col.name="functional.cluster")
-DimPlot(data.seurat.CD8, reduction = "umap", group.by = "functional.cluster") + ggtitle("UMAP by study")
-DimPlot(data.seurat.CD8, reduction = "umap", split.by  = "cluster.lab") + ggtitle("UMAP by study")
-DimPlot(data.seurat.CD8, reduction = "umap", split.by = "functional.cluster", group.by = "cluster.lab") + ggtitle("UMAP by study")
-DimPlot(data.seurat.CD8, reduction = "umap", split.by = "cluster.lab", group.by = "functional.cluster") + ggtitle("UMAP by study")
+table(data.seurat.CD8$functional.cluster)
+data.seurat.CD8.sub <- subset(data.seurat.CD8, subset=functional.cluster %in% 
+                                c("CD8_NaiveLike","CD8_EffectorMemory","CD8_EarlyActiv","CD8_Tpex","CD8_Tex"))
+  
+DimPlot(data.seurat.CD8.sub, reduction = "umap", group.by = "functional.cluster") + ggtitle("UMAP by functional cluster")
+DimPlot(data.seurat.CD8.sub, reduction = "umap", split.by  = "cluster.lab") + ggtitle("UMAP by unsupervised cluster")
+DimPlot(data.seurat.CD8.sub, reduction = "umap", split.by = "functional.cluster", group.by = "cluster.lab") + ggtitle("UMAP by study")
+DimPlot(data.seurat.CD8.sub, reduction = "umap", split.by = "cluster.lab", group.by = "functional.cluster") + ggtitle("UMAP by study")
 ```
-```{r}
+
+```{r fig.height=4}
 library(patchwork)
 Idents(data.seurat.CD8.projected) <- "cluster.lab"
 table(data.seurat.CD8.projected$cluster.lab)
@@ -284,20 +335,47 @@ table(data.seurat.CD8.projected.byCluster$cluster.lab)
 data.seurat.CD8.projected.byCluster <- SplitObject(data.seurat.CD8.projected)
 plots <- list()
 for(c in levels(data.seurat.CD8.projected$cluster.lab)){
-queryObject <- data.seurat.CD8.projected.byCluster[[c]]
-mainState <- names(sort(table(queryObject$functional.cluster),decreasing = T))[1]
-discDim <- find.discriminant.dimensions(ref = ref, query =queryObject,state = mainState,print.n = 6)
-devComp <- sum(discDim$stat_abs[discDim$p_val < 1e-5])
-print(paste(mainState,round(devComp,2)))
-plots[[c]] <- plot.projection(ref,queryObject) + ggtitle(label = c,subtitle = paste0("Main state",mainState))
+  queryObject <- data.seurat.CD8.projected.byCluster[[c]]
+  mainState <- names(sort(table(queryObject$functional.cluster),decreasing = T))[1]
+  discDim <- find.discriminant.dimensions(ref = ref, query =queryObject,state = mainState,print.n = 6)
+  devComp <- sum(discDim$stat_abs[discDim$p_val < 1e-5])
+  print(paste(mainState,round(devComp,2)))
+  plots[[c]] <- plot.projection(ref,queryObject, linesize = 0.3, pointsize = 0.5) + ggtitle(label = c,subtitle = paste0("Main state",mainState))
 }
-wplot <- wrap_plots(plots)
-ggsave("pdf/projected.umap.pdf",wplot, width = 20, height = 20)
+wplot <- wrap_plots(plots, ncol = 3)
+#wplot
+ggsave("pdf/projected.umap.by.unsup_cluster.pdf",wplot, width = 15, height = 8)
 ```
 
 
 ```{r}
-plot.discriminant.3d(ref = ref, query.control = data.seurat.CD8.projected.byCluster$C4, query=data.seurat.CD8.projected.byCluster$C5, extra.dim = "ICA_26", query.state = "CD8_Tex")
+plot3d <- plot.discriminant.3d(ref = ref, query.control = data.seurat.CD8.projected.byCluster$C4, query=data.seurat.CD8.projected.byCluster$C5, extra.dim = "ICA_26", query.state = "CD8_Tex")
+
+plot3d
+
+plot3d <- plot.discriminant.3d(ref = ref, query=data.seurat.CD8.projected.byCluster$C5, extra.dim = "ICA_26", query.state = "CD8_Tex")
+
+plot3d
+```
+
+Export static figures
+```{r}
+library(processx)
+#Top view
+zoom <- 8
+plot3d <- plot3d  %>%   layout(scene=list(camera = list(eye = list(x = 0, y = 0, z= 0.25*zoom), up=list(x=0,y=1,z=0))))
+plot3d
+#orca(plot3d, format="pdf",file="pdf/C5vsC4_ICA25_top.pdf",width = 1200,height = 1200, scale = 2)
+
+#Side view
+zoom <- 2
+i=pi*4/3
+j=0
+plot3d <- plot3d  %>% layout(scene=list(camera = list(eye = list(x = cos(i)*zoom, y = sin(i)*zoom, z= cos(j)), up=list(x=0,y=1,z=1) )))
+plot3d
+
+orca(plot3d,format="pdf",file="pdf/C5vsref_ICA26_side.pdf",width = 700,height = 600, scale = 3)
+
 ```
 
 ```{r}
@@ -312,16 +390,15 @@ plot.discriminant.3d(ref = ref, query.control = data.seurat.CD8.projected.sample
 
 
 ```{r}
-FeaturePlot(data.seurat.CD8.projected.Tex,features = c("Gzmc","Tox"), split.by = "cluster.lab")
-```
-
-```{r}
+library(MAST)
 Idents(data.seurat.CD8.projected) <- "functional.cluster"
 data.seurat.CD8.projected.Tex <- subset(data.seurat.CD8.projected, idents = "CD8_Tex")
 Idents(data.seurat.CD8.projected.Tex) <- "cluster.lab"
+FeaturePlot(data.seurat.CD8.projected.Tex,features = c("Gzmc","Tox"), split.by = "cluster.lab")
 VlnPlot(data.seurat.CD8.projected.Tex,features = c("Tox","Gzmc","Pdcd1"))
 DefaultAssay(data.seurat.CD8.projected.Tex) <- "RNA"
-markers4vs5 <- FindMarkers(data.seurat.CD8.projected.Tex,ident.1 = "C4",ident.2 = "C5",test.use = "MAST", min.diff.pct = 0.01,logfc.threshold = 0.25, min.pct=0.05, assay="RNA")
+
+markers4vs5 <- FindMarkers(data.seurat.CD8.projected.Tex,ident.1 = "C5",ident.2 = "C4",test.use = "MAST", min.diff.pct = 0.01,logfc.threshold = 0.25, min.pct=0.05, assay="RNA")
 ```
 
 ```{r}
@@ -330,6 +407,6 @@ EnhancedVolcano(markers4vs5,
     lab = rownames(markers4vs5),
     x = 'avg_log2FC',
     y = 'p_val',FCcutoff = 1, drawConnectors = T, maxoverlapsConnectors = 50, pCutoff = 1e-10)
-ggsave("pdf/Tex.c4vsc5.volcano.pdf",width = 6,height = 6)
+ggsave("pdf/Tex.c4vsc5.volcano.pdf",width = 9,height = 8)
 
 ```
