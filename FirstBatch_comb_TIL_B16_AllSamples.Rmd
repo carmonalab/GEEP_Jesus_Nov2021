@@ -216,8 +216,27 @@ Idents(data.seurat.CD8) <- factor(data.seurat.CD8$cluster.lab)
 DotPlot(data.seurat.CD8, features = (facsMarkers), cols= "RdYlGn") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 dir.create("./pdf")
 ggsave("pdf/allSamples.DotPlot.clusters.pdf",width = 8, height = 3)
+
+
+facsMarkers <- qq(Mki67,Sell,Il7r,Tcf7,Lef1,Klrg1,Cx3cr1,Gzmk,Gzma,Gzmb,Gzmc,Tox,Pdcd1,Lag3,Havcr2,Entpd1)
+
 VlnPlot(data.seurat.CD8, features = (facsMarkers),stack = T, flip = T, fill.by = "ident", cols = clusterColors)
+
 ggsave("pdf/allSamples.VlnPlot.clusters.pdf",width = 5, height = 5)
+
+
+facsMarkers <- qq(Sell,Il7r,Tcf7,Lef1,Klrg1,Cx3cr1,Xcl1,Il2ra,Id2,Tnfrsf9,Gzmk,Gzma,Gzmb,Gzmc,Tox,Pdcd1,Lag3,Havcr2,Entpd1,Mki67)
+
+a <- VlnPlot(data.seurat.CD8, features = (facsMarkers[1:10]),stack = T, flip = T, fill.by = "ident", cols = clusterColors) + 
+  theme(legend.position = "none", axis.title.x = element_blank()) 
+
+b <- VlnPlot(data.seurat.CD8, features = (facsMarkers[11:20]),stack = T, flip = T, fill.by = "ident", cols = clusterColors) + 
+  theme(axis.title = element_blank()) 
+
+a | b
+
+ggsave("pdf/allSamples.VlnPlot.clusters.2col.pdf",width = 8, height = 4)
+
 ```
 
 
