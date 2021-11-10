@@ -225,12 +225,12 @@ VlnPlot(data.seurat.CD8, features = (facsMarkers),stack = T, flip = T, fill.by =
 ggsave("pdf/allSamples.VlnPlot.clusters.pdf",width = 5, height = 5)
 
 
-facsMarkers <- qq(Sell,Il7r,Tcf7,Lef1,Klrg1,Cx3cr1,Xcl1,Il2ra,Id2,Tnfrsf9,Gzmk,Gzma,Gzmb,Gzmc,Tox,Pdcd1,Lag3,Havcr2,Entpd1,Mki67)
+facsMarkers <- qq(Sell,Il7r,Tcf7,Lef1,Klrg1,Cx3cr1,Il2ra,Tnfrsf9,Id2,Nfatc1,Batf,Gzmk,Gzma,Gzmb,Gzmc,Xcl1,Tox,Pdcd1,Lag3,Havcr2,Entpd1,Mki67)
 
-a <- VlnPlot(data.seurat.CD8, features = (facsMarkers[1:10]),stack = T, flip = T, fill.by = "ident", cols = clusterColors) + 
+a <- VlnPlot(data.seurat.CD8, features = (facsMarkers[1:11]),stack = T, flip = T, fill.by = "ident", cols = clusterColors) + 
   theme(legend.position = "none", axis.title.x = element_blank()) 
 
-b <- VlnPlot(data.seurat.CD8, features = (facsMarkers[11:20]),stack = T, flip = T, fill.by = "ident", cols = clusterColors) + 
+b <- VlnPlot(data.seurat.CD8, features = (facsMarkers[12:22]),stack = T, flip = T, fill.by = "ident", cols = clusterColors) + 
   theme(axis.title = element_blank()) 
 
 a | b
