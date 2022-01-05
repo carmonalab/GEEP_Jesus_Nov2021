@@ -10,7 +10,6 @@ knit: (function(input_file, encoding) {
 ---
 
 ```{r}
-renv::activate()
 renv::restore()
 library(remotes)
 #install_github("carmonalab/UCell", ref="v1.1")
@@ -225,7 +224,9 @@ VlnPlot(data.seurat.CD8, features = (facsMarkers),stack = T, flip = T, fill.by =
 ggsave("pdf/allSamples.VlnPlot.clusters.pdf",width = 5, height = 5)
 
 
-facsMarkers <- qq(Sell,Il7r,Tcf7,Lef1,Klrg1,Cx3cr1,Il2ra,Tnfrsf9,Id2,Nfatc1,Batf,Gzmk,Gzma,Gzmb,Gzmc,Xcl1,Tox,Pdcd1,Lag3,Havcr2,Entpd1,Mki67)
+#2 cols
+facsMarkers <- qq(Sell,Il7r,Tcf7,Lef1,Klrg1,Cx3cr1,Il2ra,Tnfrsf9,Id2,Nfatc1,Batf,
+                  Gzmk,Gzma,Gzmb,Gzmc,Xcl1,Tox,Pdcd1,Lag3,Havcr2,Entpd1,Mki67)
 
 a <- VlnPlot(data.seurat.CD8, features = (facsMarkers[1:11]),stack = T, flip = T, fill.by = "ident", cols = clusterColors) + 
   theme(legend.position = "none", axis.title.x = element_blank()) 
@@ -236,6 +237,24 @@ b <- VlnPlot(data.seurat.CD8, features = (facsMarkers[12:22]),stack = T, flip = 
 a | b
 
 ggsave("pdf/allSamples.VlnPlot.clusters.2col.pdf",width = 8, height = 4)
+
+#3 cols
+facsMarkers <- qq(Sell,Il7r,Tcf7,Lef1,Klrg1,Cx3cr1,Il2ra,Tnfrsf9,Id2,
+                  Gzmk,Gzma,Gzmb,Gzmc, Ccl3, Ccl4, Ccl5, Nfatc1,Batf, 
+                  Pdcd1,Lag3,Havcr2,Entpd1, Tox, Xcl1, Nr4a1, Nr4a2, Nr4a3, Mki67)
+
+a <- VlnPlot(data.seurat.CD8, features = (facsMarkers[1:9]),stack = T, flip = T, fill.by = "ident", cols = clusterColors) + 
+  theme(legend.position = "none", axis.title.x = element_blank()) 
+
+b <- VlnPlot(data.seurat.CD8, features = (facsMarkers[10:18]),stack = T, flip = T, fill.by = "ident", cols = clusterColors) + 
+  theme(axis.title = element_blank(), legend.position = "none", axis.title.x = element_blank()) 
+
+c <- VlnPlot(data.seurat.CD8, features = (facsMarkers[19:28]),stack = T, flip = T, fill.by = "ident", cols = clusterColors) + 
+  theme(axis.title = element_blank()) 
+
+a | b | c
+
+ggsave("pdf/allSamples.VlnPlot.clusters.3col.pdf",width = 9, height = 4)
 
 ```
 
@@ -425,7 +444,13 @@ library(EnhancedVolcano)
 EnhancedVolcano(markers4vs5,
     lab = rownames(markers4vs5),
     x = 'avg_log2FC',
-    y = 'p_val',FCcutoff = 1, drawConnectors = T, maxoverlapsConnectors = 50, pCutoff = 1e-10)
+    y = 'p_val_adj',FCcutoff = 1, drawConnectors = T, maxoverlapsConnectors = 50, pCutoff = 1e-5)
 ggsave("pdf/Tex.c4vsc5.volcano.pdf",width = 9,height = 8)
+
+```
+
+```{r}
+markers4vs5 <- FindMarkers(data.seurat.CD8.projected.Tex,ident.1 = "C5",ident.2 = "C4",test.use = "MAST", min.diff.pct = 0.01,logfc.threshold = 0.1, min.pct=0.01, assay="RNA")
+markers4vs5[rownames(markers4vs5) %in% c("Bcl2","Batf","Bhlhe40") ,]
 
 ```
