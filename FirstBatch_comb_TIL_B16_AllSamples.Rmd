@@ -12,10 +12,10 @@ knit: (function(input_file, encoding) {
 ```{r}
 renv::restore()
 library(remotes)
-#install_github("carmonalab/UCell", ref="v1.1")
-#install_github("carmonalab/scGate",ref="v1.0.0")
-#install_github("carmonalab/ProjecTILs",ref="v2.0.0")
-#install_github("ncborcherding/scRepertoire",ref="3f676c5beca96878585811ed557813dafd241e48") # version 1.3.2
+#remotes::install_github("carmonalab/UCell", ref="v1.1")
+#remotes::install_github("carmonalab/scGate",ref="v1.0.0")
+#remotes::install_github("carmonalab/ProjecTILs",ref="dev")
+#remotes::install_github("ncborcherding/scRepertoire",ref="3f676c5beca96878585811ed557813dafd241e48") # version 1.3.2
 
 ```
 
@@ -383,15 +383,15 @@ ProjecTILs analysis
 
 ```{r}
 ref <- load.reference.map()
-data.seurat.CD8.projected <- make.projection(data.seurat.CD8,ref = ref,filter.cells = F)
-plot.projection(ref,data.seurat.CD8.projected)
+data.seurat.CD8.projected <- make.projection(data.seurat.CD8,ref = ref,filter.cells = F, batch_correction = 0.1)
+plot.projection(ref,data.seurat.CD8.projected, pointsize = 0.3, linesize = 0.5)
 data.seurat.CD8.projected <- cellstate.predict(ref,data.seurat.CD8.projected)
 ```
 
 
 ```{r}
 data.seurat.CD8 <- AddMetaData(data.seurat.CD8,data.seurat.CD8.projected$functional.cluster,col.name="functional.cluster")
-table(data.seurat.CD8$functional.cluster)
+as.data.frame(sort(table(data.seurat.CD8$functional.cluster), decreasing = T))
 data.seurat.CD8.sub <- subset(data.seurat.CD8, subset=functional.cluster %in% 
                                 c("CD8_NaiveLike","CD8_EffectorMemory","CD8_EarlyActiv","CD8_Tpex","CD8_Tex"))
   
@@ -419,8 +419,45 @@ for(c in levels(data.seurat.CD8.projected$cluster.lab)){
   plots[[c]] <- plot.projection(ref,queryObject, linesize = 0.3, pointsize = 0.5) + ggtitle(label = c,subtitle = paste0("Main state",mainState))
 }
 wplot <- wrap_plots(plots, ncol = 3)
-#wplot
+wplot
+
+
 ggsave("pdf/projected.umap.by.unsup_cluster.pdf",wplot, width = 15, height = 8)
+```
+
+Recalculate embeddings with new projected data (focus on C4 and C5)
+```{r}
+palette <- c("#edbe2a", "#A58AFF", "#53B400", "#F8766D", "#00B6EB", "#d1cfcc", "#FF0000", "#87f6a5", "#e812dd")
+names(palette) <- levels(ref$functional.cluster)
+
+which.clusters <- c('C4','C5') 
+proj.sub <- subset(data.seurat.CD8.projected, subset=cluster.lab %in% which.clusters)
+
+merged <- recalculate.embeddings(ref=ref, projected=proj.sub, ndim=15, recalc.pca = T, umap.method = 'umap', resol = 0.8)
+
+Idents(merged) <- "functional.cluster"
+plot.projection(ref=merged, query=subset(merged, subset=ref_or_query=="query"), cols = palette, linesize=0.5) + theme(aspect.ratio = 1)
+```
+
+A different visualization
+```{r fig.width=4}
+a <- DimPlot(merged, reduction = "umap", cols=palette) + theme(aspect.ratio=1) + 
+  theme(axis.ticks = element_blank(), axis.text = element_blank()) + NoLegend()
+sub <- merged
+sub$functional.cluster[sub$ref_or_query == "query"] = NA
+b <- DimPlot(sub, reduction = "umap", cols=palette, 
+             na.value = 'grey95', group.by = "functional.cluster") + 
+  theme(aspect.ratio=1, axis.ticks = element_blank(), axis.text = element_blank()) + NoLegend() + ggtitle("Reference")
+
+sub <- merged
+sub$functional.cluster[sub$ref_or_query == "ref"] = NA
+c <- DimPlot(sub, reduction = "umap", cols=clusterColors[which.clusters], 
+             group.by = "cluster.lab", na.value = 'grey95') + 
+  theme(aspect.ratio=1, axis.ticks = element_blank(), axis.text = element_blank()) + ggtitle("Projected")
+
+d <- FeaturePlot(sub, features="newclusters") + theme(aspect.ratio = 1)
+
+(a | c)/(b | d)
 ```
 
 
@@ -489,6 +526,9 @@ ggsave("pdf/Tex.c4vsc5.volcano.pdf",width = 9,height = 8)
 
 ```{r}
 markers4vs5 <- FindMarkers(data.seurat.CD8.projected.Tex,ident.1 = "C5",ident.2 = "C4",test.use = "MAST", min.diff.pct = 0.01,logfc.threshold = 0.1, min.pct=0.01, assay="RNA")
+
+head(markers4vs5)
+
 markers4vs5[rownames(markers4vs5) %in% c("Bcl2","Batf","Bhlhe40") ,]
 
 ```
