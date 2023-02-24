@@ -503,18 +503,29 @@ plot.discriminant.3d(ref = ref, query.control = data.seurat.CD8.projected.sample
 
 
 ```{r}
-library(MAST)
+
 Idents(data.seurat.CD8.projected) <- "functional.cluster"
 data.seurat.CD8.projected.Tex <- subset(data.seurat.CD8.projected, idents = "CD8_Tex")
 Idents(data.seurat.CD8.projected.Tex) <- "cluster.lab"
 FeaturePlot(data.seurat.CD8.projected.Tex,features = c("Gzmc","Tox"), split.by = "cluster.lab")
 VlnPlot(data.seurat.CD8.projected.Tex,features = c("Tox","Gzmc","Pdcd1"))
 DefaultAssay(data.seurat.CD8.projected.Tex) <- "RNA"
-
-markers4vs5 <- FindMarkers(data.seurat.CD8.projected.Tex,ident.1 = "C5",ident.2 = "C4",test.use = "MAST", min.diff.pct = 0.01,logfc.threshold = 0.25, min.pct=0.05, assay="RNA")
 ```
 
+# Differentially expressed genes between C4 and C5
 ```{r}
+library(MAST)
+data.use <- data.seurat.CD8.projected.Tex
+#data.use <- data.seurat.CD8.projected
+
+Idents(data.use) <- "cluster.lab"
+markers4vs5 <- FindMarkers(data.use, ident.1 = "C5",ident.2 = "C4",
+                           test.use = "MAST", min.diff.pct = 0.01,
+                           logfc.threshold = 0.25, min.pct=0.05, assay="RNA")
+
+```
+
+```{r fig.height=3}
 library(EnhancedVolcano)
 EnhancedVolcano(markers4vs5,
     lab = rownames(markers4vs5),
@@ -523,9 +534,13 @@ EnhancedVolcano(markers4vs5,
 ggsave("pdf/Tex.c4vsc5.volcano.pdf",width = 9,height = 8)
 
 ```
-
+Save marker genes to file
 ```{r}
-markers4vs5 <- FindMarkers(data.seurat.CD8.projected.Tex,ident.1 = "C5",ident.2 = "C4",test.use = "MAST", min.diff.pct = 0.01,logfc.threshold = 0.1, min.pct=0.01, assay="RNA")
+up.c5 <- markers4vs5[markers4vs5$avg_log2FC > 0,]
+up.c4 <- markers4vs5[markers4vs5$avg_log2FC < 0,]
+#Save to file
+write.csv(up.c4, file="DEG.upC4.csv")
+write.csv(up.c5, file="DEG.upC5.csv")
 
 head(markers4vs5)
 
